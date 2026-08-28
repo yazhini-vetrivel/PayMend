@@ -1,0 +1,21 @@
+1)Initialize DB: 
+python -m app.db
+
+2)Update dependencies:  
+pip install pandas scikit-learn joblib jupyter -r requirements.txt
+
+3)Populate DB with synthetic failed payments:   
+python -m app.ingestion --synthetic
+
+4)Check if failure detection works:   
+python -c "
+from app.db import get_session
+from app.ingestion import get_pending_failed_payments
+with get_session() as s:
+    print(len(get_pending_failed_payments(s)), 'pending failed payments')"
+
+5)Verifying the 6scenarios:
+python -m app.classifier
+
+[timeout,insufficient_funds,invalid_card,expired_card,auth_failure,risk_block]
+
