@@ -1,0 +1,42 @@
+###
+STEPS COMPLETED TODAY:
+###
+
+~Github repo setup
+~Directory setup
+~Razorpay API key generation and setup
+~Razorpayclient setup
+~DB setup
+~Ingestion layer with polling setup
+~Failure detection
+~Completed:
+1)Rule based classifier
+2)Synthetic data generation
+3)Labeled data generation for testing
+
+###
+PROBLEMS FACED:
+###
+
+1)API keys were inaccessible in razorpay_client  =>  Tackled by importing os and specifying .env file name
+2)Had to re-init old db file while adding failure detection
+3)Planned of doing "Webhooks" in Ingestion layer,but it was quite complex to demonstrate.  =>So chose to implement "Polling" instead, which is easier and preferrable for demonstration
+4)Faced errors in data generation when i tried to do the synthetic data and labeled data generation in terminal.  =>Thus executed an equivalent python code inside the suitable notebook and achieved the same desired result
+5)Started training ML classifier, but there is some issue.
+
+###
+Approach vs Reality
+###
+
+  Initially thought Razorpay API could directly simulate failures.Realised failures only happen via test cards.
+  Pivoted to synthetic data generation for bulk training.
+  Planned ML classifier on text (failure_reason), but shifted to structured features for better control.
+
+
+
+###
+Goal for tomorrow
+###
+Aiming to solve the classifier issue and train the classifier model successfully and get the comparison-based result between Rule-based and ML.
+Integrate classifier results into recovery flow and design policy engine
+
