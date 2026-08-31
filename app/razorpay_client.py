@@ -17,16 +17,16 @@ from datetime import datetime, timezone
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+# If your file is named secret.env, load it explicitly
+load_dotenv("secret.env")
 
-RAZORPAY_BASE_URL = "https://api.razorpay.com/v1"
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
 if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
     raise RuntimeError(
         "RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET missing. "
-        "Add them to your .env file (use your TEST mode keys)."
+        "Add them to your .env or secret.env file (use your TEST mode keys)."
     )
 
 
@@ -47,20 +47,37 @@ class RazorpayClient:
     # ------------------------------------------------------------------
     # Internal request helper
     # ------------------------------------------------------------------
+    # Transient network errors (timeout, connection reset, DNS blip) get
+    # retried with backoff — these are infrastructure hiccups, not real
+    # API failures, and a single blip shouldn't permanently fail the call.
+    # HTTP error responses (4xx/5xx that DID reach Razorpay) are NOT
+    # retried here — those are real answers from the API, not network
+    # noise, and blind-retrying them could double-charge a card.
+    _MAX_NETWORK_RETRIES = 3
+    _NETWORK_RETRY_BACKOFF_SECONDS = 1  # 1s, 2s, 4s
+
     def _request(self, method: str, path: str, params=None, json_body=None):
         url = f"{RAZORPAY_BASE_URL}{path}"
-        try:
-            resp = requests.request(
-                method=method,
-                url=url,
-                auth=self.auth,
-                params=params,
-                json=json_body,
-                timeout=self.timeout,
-            )
-        except requests.exceptions.RequestException as e:
-            # network-level failure (timeout, DNS, connection refused, etc.)
-            raise RazorpayError(status_code=None, payload=str(e))
+
+        last_network_error = None
+        for attempt in range(self._MAX_NETWORK_RETRIES):
+            try:
+                resp = requests.request(
+                    method=method,
+                    url=url,
+                    auth=self.auth,
+                    params=params,
+                    json=json_body,
+                    timeout=self.timeout,
+                )
+                break  # got an actual HTTP response, stop retrying
+            except requests.exceptions.RequestException as e:
+                last_network_error = e
+                if attempt < self._MAX_NETWORK_RETRIES - 1:
+                    time.sleep(self._NETWORK_RETRY_BACKOFF_SECONDS * (2 ** attempt))
+        else:
+            # loop finished without ever getting a response
+            raise RazorpayError(status_code=None, payload=str(last_network_error))
 
         if resp.status_code >= 400:
             try:
