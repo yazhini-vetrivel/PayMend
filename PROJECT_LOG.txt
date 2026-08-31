@@ -1,42 +1,95 @@
-###
-STEPS COMPLETED TODAY:
-###
+# Day 1 — Payment Failure → Root Cause → Recovery Agent
 
-~Github repo setup
-~Directory setup
-~Razorpay API key generation and setup
-~Razorpayclient setup
-~DB setup
-~Ingestion layer with polling setup
-~Failure detection
-~Completed:
-1)Rule based classifier
-2)Synthetic data generation
-3)Labeled data generation for testing
+*Buildathon project: an AI agent that monitors Razorpay for failed
+payments, analyzes their reasons, and (eventually) recovers them.*
 
-###
-PROBLEMS FACED:
-###
+This was the day of the foundations: a GitHub repo, a database, an
+ingestion layer, and the first step towards intelligence — a rule-based
+classifier that takes the raw Razorpay error code and outputs the business
+level reason for the failure. That's what got done, what went wrong and how
+my initial plan differed from what really happened.
 
-1)API keys were inaccessible in razorpay_client  =>  Tackled by importing os and specifying .env file name
-2)Had to re-init old db file while adding failure detection
-3)Planned of doing "Webhooks" in Ingestion layer,but it was quite complex to demonstrate.  =>So chose to implement "Polling" instead, which is easier and preferrable for demonstration
-4)Faced errors in data generation when i tried to do the synthetic data and labeled data generation in terminal.  =>Thus executed an equivalent python code inside the suitable notebook and achieved the same desired result
-5)Started training ML classifier, but there is some issue.
+## What got done
 
-###
-Approach vs Reality
-###
+- Project repository created
+- Razorpay test-mode API keys generated and added to the config
+- `RazorpayClient` wrapper built (Orders + Payments API)
+- SQLite database initialized via SQLAlchemy
+- Basic ingestion layer with polling mechanism
+- Failure detection (extracting payments waiting for recovery)
+- Rule-based root-cause classifier
+- Failed-payment synthetic data generator
+- Labeled data generator for the classifier testing purposes
 
-  Initially thought Razorpay API could directly simulate failures.Realised failures only happen via test cards.
-  Pivoted to synthetic data generation for bulk training.
-  Planned ML classifier on text (failure_reason), but shifted to structured features for better control.
+## Problems faced (and how I got past them)
 
+**1. Could not access the API keys within `razorpay_client.py` module.**
+The fix was to import `os` and point the module directly at the `.env` file
+— the client did not recognize the environment variables otherwise.
 
+**2. Had to initialize the old DB file when implementing the failure
+detection.** The addition of the failure-detection query involved a
+schema change, which meant dropping and initializing the old SQLite file
+once again. Not a big deal, but one to remember: every schema change means
+a new `python -m app.db` (or migrations, eventually).
 
-###
-Goal for tomorrow
-###
-Aiming to solve the classifier issue and train the classifier model successfully and get the comparison-based result between Rule-based and ML.
-Integrate classifier results into recovery flow and design policy engine
+**3. Webhooks were more than I needed.** My original plan involved
+implementing webhook-based ingestion, but creating a publicly accessible
+endpoint plus its signature verification was quite an effort for what I
+could achieve with polling. So, switched to polling — easier to
+demonstrate and equally valid way of proving my recovery logic.
+
+**4. Data generation code kept failing when executed from the terminal.**
+Instead of continuing to fight with the environment in the terminal, I
+moved the equivalent of this code to a Jupyter Notebook cell and executed
+it there — it worked as expected.
+
+**5. Tried to train the ML classifier, but ran into a problem I couldn't
+solve yet.** This will be my first task for tomorrow.
+
+## Approach vs. reality
+
+Initially, I thought that the API would allow to simulate payment failures
+directly. Turns out, failures only occur after running an actual checkout
+flow with
+
+##################################################################################
+# Day 2 — Payment Failure → Root Cause → Recovery Agent
+
+*Buildathon project: an AI agent that watches Razorpay for failed payments, diagnoses why they failed, and recovers them.*
+
+Today started with a broken ML classifier training and the goal to get that fixed while also putting together a policy engine and integrating everything. ML turned out to be harder than expected, so I decided to push the debugging aside and just finish what depended on the rule-based classifier anyway — it works standalone already, anyway, and that's what the recovery flow actually requires. Today the agent went from "classifies a failure" to "classifies, decides, acts, and explains itself".
+
+## What got done
+
+- Policy engine (`app/policy.py`) — maps each root cause to an action: retry with backoff, notify, or escalate, every rule bounded by a hard retry cap
+- Recovery executor (`app/recovery.py`) — the full closed loop: fetch → classify → decide → execute → record → log, for one payment at a time
+- Batch runner + metrics script (`scripts/run_recovery_batch.py`) — runs the agent over every pending failed payment across multiple rounds and prints/saves a recovery-rate report
+- Deliberately went looking for real bugs (rather than stumbling on them) and found two, plus verified one thing that could easily have been a bug but isn't
+- Wrote up `ARCHITECTURE.md`, `README.md`, and `DEBUGGING.md`
+
+## Today's numbers
+
+```
+Processed 70 failed payments, recovered 26.5% (₹11,978 out of ₹45,230)
+Flagged for manual review: 20
+
+By root cause:
+  timeout               100.0% recovered
+  auth_failure            57.6% recovered
+  insufficient_funds        0.0% — notified, awaiting delayed retry window
+  invalid_card / expired    0.0% — notified, awaiting customer action
+  risk_block                 escalated for manual review
+
+By action type:
+  retry     73.3% success rate
+  notify   100.0% delivery rate
+  escalate 100.0% flagged rate
+```
+
+## Problems faced (and how I got past them)
+
+**1. Retries that never actually got retried.** The batch runner should show fewer payments processed each round as retries resolve. It didn't — round sizes stayed the same instead of shrinking. Turned out any failed retry was being marked "processed" immediately, even with attempts left, which silently killed attempts 2 and 3. One conditional fix later, round sizes converged perfectly: 70 → 19 → 0.
+
+**2. The concurrency bug — the one that actually taught me something.** Firing three calls simultaneously at the recovery function for the *exact* same payment, expected two to politely back off. Instead I got three
 
