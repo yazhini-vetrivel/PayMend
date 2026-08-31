@@ -88,6 +88,16 @@ class Payment(Base):
     # so we don't process the same failed payment twice (Step 6).
     processed_for_recovery = Column(Boolean, default=False, nullable=False)
 
+    # Set True when policy.py escalates this payment (Step 9) — surfaces
+    # it for a human to look at rather than the agent guessing further.
+    needs_manual_review = Column(Boolean, default=False, nullable=False)
+
+    # Simple lock so two concurrent execute_recovery() calls on the same
+    # payment (duplicate webhook, overlapping batch runs) can't race each
+    # other. Acquired via an atomic compare-and-swap UPDATE, not a plain
+    # read-then-write (see app/recovery.py::_acquire_lock).
+    recovery_in_progress = Column(Boolean, default=False, nullable=False)
+
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
