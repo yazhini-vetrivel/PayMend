@@ -19,3 +19,51 @@ python -m app.classifier
 
 [timeout,insufficient_funds,invalid_card,expired_card,auth_failure,risk_block]
 
+6)python -m app.ingestion --synthetic
+
+7)Test one payment end-end:
+python -m app.recovery =>O/P
+      =>{
+  "payment_id": 1,
+  "razorpay_payment_id": "pay_SIM86621ee6a91e45",
+  "root_cause": "timeout",
+  "action_type": "retry",
+  "action_status": "success",
+  "final_payment_status": "recovered",
+  "recovered_amount": 99900
+}
+
+8)Run full batch with multiple rounds:
+python -c "
+from app.recovery import run_recovery_batch
+for i in range(4):
+    r = run_recovery_batch()
+    print(f'Round {i+1}: {len(r)} processed')
+" 
+=>O/P:Round 1: 69 processed
+Round 2: 18 processed
+Round 3: 1 processed
+Round 4: 0 processed
+
+9)Run actual demo:
+python scripts/run_recovery_batch.py
+  =>O/P:
+============================================================
+RECOVERY BATCH SUMMARY
+============================================================
+Processed 70 failed payments, recovered 20.9% (Rs.10,079.00 out of Rs.48,330.00)
+Flagged for manual review: 20
+
+-- Breakdown by root cause --
+  auth_failure         count= 10  recovered=    Rs.3,394.00 /     Rs.5,090.00  (66.7%)
+  expired_card         count= 10  recovered=        Rs.0.00 /     Rs.7,890.00  (0.0%)
+  insufficient_funds   count= 15  recovered=        Rs.0.00 /    Rs.11,885.00  (0.0%)
+  invalid_card         count= 15  recovered=        Rs.0.00 /    Rs.12,985.00  (0.0%)
+  risk_block           count=  5  recovered=        Rs.0.00 /     Rs.3,795.00  (0.0%)
+  timeout              count= 15  recovered=    Rs.6,685.00 /     Rs.6,685.00  (100.0%)
+
+-- Breakdown by action type --
+  escalate     attempts= 20  success_rate=100.0%
+  notify       attempts= 40  success_rate=100.0%
+  retry        attempts= 33  success_rate=63.6%
+============================================================
