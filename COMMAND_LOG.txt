@@ -40,30 +40,35 @@ for i in range(4):
     r = run_recovery_batch()
     print(f'Round {i+1}: {len(r)} processed')
 " 
-=>O/P:Round 1: 69 processed
-Round 2: 18 processed
-Round 3: 1 processed
-Round 4: 0 processed
+=>O/P:
+Round 1: processed 110 payment(s)
+Round 2: processed 37 payment(s)
+Round 3: processed 16 payment(s)
+Round 4: processed 10 payment(s)
+Round 5: processed 6 payment(s)
+Round 6: processed 4 payment(s)
+Round 7: processed 4 payment(s)
+Round 8: processed 3 payment(s)
+Round 9: processed 2 payment(s)
+Round 10: processed 1 payment(s)
+WARNING: hit max_rounds=10 without full convergence. Some payments may still be retryable — this is a safety cap, not a bug.
 
-9)Run actual demo:
-python scripts/run_recovery_batch.py
-  =>O/P:
 ============================================================
 RECOVERY BATCH SUMMARY
 ============================================================
-Processed 70 failed payments, recovered 20.9% (Rs.10,079.00 out of Rs.48,330.00)
-Flagged for manual review: 20
+Processed 420 failed payments, recovered 83.8% (Rs.235,942.00 out of Rs.281,580.00)
+Flagged for manual review: 105
 
 -- Breakdown by root cause --
-  auth_failure         count= 10  recovered=    Rs.3,394.00 /     Rs.5,090.00  (66.7%)
-  expired_card         count= 10  recovered=        Rs.0.00 /     Rs.7,890.00  (0.0%)
-  insufficient_funds   count= 15  recovered=        Rs.0.00 /    Rs.11,885.00  (0.0%)
-  invalid_card         count= 15  recovered=        Rs.0.00 /    Rs.12,985.00  (0.0%)
-  risk_block           count=  5  recovered=        Rs.0.00 /     Rs.3,795.00  (0.0%)
-  timeout              count= 15  recovered=    Rs.6,685.00 /     Rs.6,685.00  (100.0%)
+  auth_failure         count= 60  recovered=   Rs.22,069.00 /    Rs.46,440.00  (47.5%)
+  expired_card         count= 60  recovered=   Rs.41,340.00 /    Rs.41,340.00  (100.0%)
+  insufficient_funds   count= 90  recovered=   Rs.66,310.00 /    Rs.66,310.00  (100.0%)
+  invalid_card         count= 90  recovered=   Rs.51,711.00 /    Rs.52,710.00  (98.1%)
+  risk_block           count= 30  recovered=        Rs.0.00 /    Rs.19,170.00  (0.0%)
+  timeout              count= 90  recovered=   Rs.54,512.00 /    Rs.55,610.00  (98.0%)
 
 -- Breakdown by action type --
-  escalate     attempts= 20  success_rate=100.0%
-  notify       attempts= 40  success_rate=100.0%
-  retry        attempts= 33  success_rate=63.6%
+  escalate     attempts=105  success_rate=100.0%
+  notify       attempts=240  success_rate=100.0%
+  retry        attempts=186  success_rate=64.0%
 ============================================================
