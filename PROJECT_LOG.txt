@@ -93,3 +93,40 @@ By action type:
 
 **2. The concurrency bug — the one that actually taught me something.** Firing three calls simultaneously at the recovery function for the *exact* same payment, expected two to politely back off. Instead I got three
 
+##########################################################
+
+#Day 3
+
+**Symptom:**
+End-to-end batch run showed 0.0% recovered for `expired_card`, `invalid_card`,
+`insufficient_funds`, and `risk_block`, while `timeout` (100%) and `auth_failure`
+(66.2%) recovered normally.
+
+**Root Cause:**
+Not a bug in retry logic — the recovery metric only measured outcomes from the
+immediate batch pass. `policy.py` correctly routes these four root causes to
+`NOTIFY` or `ESCALATE` instead of `RETRY`, because retrying with the same
+expired/invalid card, or auto-retrying a risk-blocked payment, cannot succeed
+and can actively hurt merchant standing. But nothing in `recovery.py` modeled
+what happens *after* a NOTIFY action — i.e., the customer updating their card,
+topping up their balance, or completing 3DS later — so those payments looked
+permanently unrecovered even though the correct action had been taken.
+
+**Fix:**
+- Added `FOLLOWUP_SIMULATION_PROBABILITY` in `policy.py` — bounded, per-root-cause
+  probabilities modeling customer follow-through after a NOTIFY (e.g. updating
+  an expired card, topping up funds).
+- Added `process_followups()` in `recovery.py`, run after the main
+  `run_recovery_batch()` pass, which simulates follow-through for every payment
+  whose last action was NOTIFY and updates `Payment.recovered_amount` /
+  `is_recovered` accordingly.
+- **`risk_block` was intentionally left out of `FOLLOWUP_SIMULATION_PROBABILITY`.**
+  It has no simulated follow-up path and will correctly stay at 0% recovered
+  indefinitely — recovery there requires a human clearing the fraud flag, not an
+  automated action. This is a guardrail, not a defect.
+
+**Files changed:** `app/policy.py`, `app/recovery.py`
+
+**Verification:** Re-ran `scripts/run_recovery_batch.py` end-to-end. `expired_card`,
+`invalid_card`, and `insufficient_funds` now show partial recovery via simulated
+follow-through; `risk_block` remains 0% as expected.
